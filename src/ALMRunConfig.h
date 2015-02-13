@@ -42,6 +42,7 @@ typedef enum _config_item_t
 	DuplicateCMD,
 	cmdSingleProecss,
 	cmdReadShortcut,
+	SaveWinPos,
 	CONFIG_BOOL_ITEMS,
 	CONFIG_ERROR_TYPE = CONFIG_BOOL_ITEMS,
 	ShowCMDErrInfo = CONFIG_ERROR_TYPE,
@@ -129,6 +130,12 @@ private:
 extern ALMRunConfig* g_config;
 extern SkinConfig *skin;
 extern bool LocationExec;
+extern int cmdrun_flags;
+
+#define CMDRUN_FLAG_RUNAS 1
+#define CMDRUN_FLAG_HIDE 2
+#define CMDRUN_FLAG_FORCEARG 4
+
 enum
 {
 	MENU_ITEM_FIRST = 10000,
@@ -148,6 +155,8 @@ enum
 	MENU_CMD_EDIT,
 	MENU_CMD_OPENDIR,
 	MENU_CMD_INFO,
+	MENU_CMD_RUNAS,
+	MENU_CMD_RUNHIDE,
 	MENU_CMD_LAST,
 };
 #endif

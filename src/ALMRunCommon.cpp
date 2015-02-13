@@ -7,6 +7,7 @@
 
 #ifdef __WXMSW__
 	#include <wx/msw/registry.h>
+	#include "TlHelp32.h"
 #endif
 /* 
 函数功能：对指定文件在指定的目录下创建其快捷方式 
@@ -130,6 +131,70 @@ void ListFiles(const wxString& dirname,wxArrayString *files,const wxString& file
 	specs.Clear();
 	exc.Clear();
 }
+
+#ifdef __WXMSW__
+static int x64sys = -1;
+BOOL IsX64()
+{
+	typedef void (WINAPI *PGNSI)(LPSYSTEM_INFO);
+	BOOL bX64 = FALSE;
+	SYSTEM_INFO si;
+	PGNSI pGNSI;
+	if (x64sys != -1) return x64sys;
+	ZeroMemory(&si, sizeof(SYSTEM_INFO));
+	pGNSI = (PGNSI) GetProcAddress(GetModuleHandle(_T("kernel32.dll")), "GetNativeSystemInfo");
+	if(NULL != pGNSI)
+	   pGNSI(&si);
+	else
+	   GetSystemInfo(&si);
+	if(si.wProcessorArchitecture==PROCESSOR_ARCHITECTURE_AMD64 )
+	   bX64 = true;
+	x64sys = bX64;
+	return bX64;
+}
+
+BOOL ActiveWindow(HWND hwnd)
+{
+	if (IsIconic(hwnd)) ShowWindow(hwnd, SW_RESTORE);
+	return (BringWindowToTop(hwnd) && SetForegroundWindow(hwnd));
+}
+
+BOOL CheckActiveProg(DWORD PID)
+{
+	PROCESSENTRY32 ProInfo;
+	ProInfo.dwSize = sizeof(PROCESSENTRY32);
+	HANDLE hProSnap;
+	HWND h = GetTopWindow(0);
+	while (h)
+	{
+		DWORD pid = 0;
+		DWORD dwTheardId = GetWindowThreadProcessId( h,&pid);
+		if (dwTheardId != 0)
+		{
+			if ( pid == PID && GetParent(h) == NULL && wxGetWindowText(h).length())
+			{
+				if (ActiveWindow(h)) return TRUE;
+			}
+		}
+		h = GetNextWindow( h , GW_HWNDNEXT);
+	}
+
+	hProSnap=CreateToolhelp32Snapshot(TH32CS_SNAPALL,0);
+	if (::Process32First(hProSnap,&ProInfo))
+	{
+		for (;::Process32Next(hProSnap,&ProInfo);)
+		{
+			if (ProInfo.th32ProcessID == PID)
+			{
+				wxMessageBox("程序已经在运行!","激活失败!");
+				return TRUE;
+			}
+		}
+	}
+	return FALSE;
+}
+
+#endif
 
 void setWinHelpText(wxWindowBase* win,const wxString& text,bool ShowToolTips)
 {
@@ -327,6 +392,8 @@ wxString GetCMDPath(const wxString& commandLine,const wxString& workingDir)
 	wxString cmdPath;
 	if (!workingDir.empty() && ::wxDirExists(workingDir))
 		::wxSetWorkingDirectory(workingDir);
+	if (commandLine.Len() >= MAX_PATH)
+		return "";
 	cmdPath = _GetCMDPath(commandLine);
 	wxSetWorkingDirectory(cwd);
 	return cmdPath;
@@ -496,7 +563,7 @@ BOOL chkSysCmd(const wxString& cmdLine,size_t * const cmdStart = NULL)
 	
 	wxString cmdName = cmdLine.substr(n);
 
-	if (cmdName.find("://",3,3) !=  wxNOT_FOUND //网址类型
+	if (cmdName.substr(0,8).find("://") != wxNOT_FOUND //网址类型
 		 || cmdName.StartsWith("::") //:: 类型系统功能调用
 		 || cmdName.StartsWith("\\\\")//网络地址或系统功能调用
 		)
@@ -509,7 +576,7 @@ BOOL chkSysCmd(const wxString& cmdLine,size_t * const cmdStart = NULL)
 //简单的分离命令和参数函数
 wxString ParseCmd(const wxString& cmdLine,wxString* const cmdArg,const wxString& workDir)
 {
-	size_t cmd_len = cmdLine.size();
+	size_t cmd_len = cmdLine.Len();
 	wxString cmdFlags(CMDFLAG_STRS);
 	wxString cmd = wxEmptyString;
 	size_t n;
@@ -544,12 +611,12 @@ wxString ParseCmd(const wxString& cmdLine,wxString* const cmdArg,const wxString&
 			k = tmp.find(" ");
 			cmd = tmp.substr(0,k);
 		}
-		else if (tmp.find("://",3,3) !=  wxNOT_FOUND)//网址类型
+		else if (tmp.substr(0,8).find("://") !=  wxNOT_FOUND)//网址类型
 			cmd = tmp;
 		else
 			cmd = GetCMDPath(tmp,workDir);
 
-		if (!cmd.empty())
+		if (cmd.Len())
 		{
 			n = k;
 			goto getParam;
@@ -565,9 +632,8 @@ wxString ParseCmd(const wxString& cmdLine,wxString* const cmdArg,const wxString&
 			if (InSpace)
 				continue;
 			lastSpace = n;
-			InSpace = true;
 			wxString _tmp = GetCMDPath(cmdLine.substr(cmd_pos,n-cmd_pos),workDir);
-			if (!_tmp.empty())
+			if (_tmp.Len())
 			{
 				cmd = _tmp;
 				break;
@@ -584,6 +650,7 @@ wxString ParseCmd(const wxString& cmdLine,wxString* const cmdArg,const wxString&
 			cmd = cmdLine.substr(cmd_pos,n-cmd_pos);
 			break;
 		}
+		InSpace = c == ' ';
 	}
 
 getParam:

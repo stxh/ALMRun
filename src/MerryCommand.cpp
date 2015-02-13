@@ -49,6 +49,7 @@ void MerryCommand::conf_cmd()
 {
 	PID = 0;
 	wxString luaCmd;
+	BOOL x64 = IsX64();
 	if (g_lua && m_commandLine.StartsWith("--LUA",&luaCmd))//是LUA脚本命令,需要转换
 	{
 
@@ -67,29 +68,36 @@ void MerryCommand::conf_cmd()
 		}
 		lua_settop(L,top);
 	}
-	else if (g_config->get(cmdReadShortcut))
+	else
 	{
-		if (wxFileName(m_commandLine).GetExt().IsSameAs("lnk",true))
+		if (g_config->get(cmdReadShortcut))
 		{
-			ALMRunCMDBase Lcmd;
-			if (ReadShortcut(m_commandLine.c_str(),&Lcmd))
+			if (wxFileName(m_commandLine).GetExt().IsSameAs("lnk",true))
 			{
-				m_commandLine = Lcmd.cmdLine;
-				if (m_flags & CMDS_FLAG_DIRS)
+				ALMRunCMDBase Lcmd;
+				if (ReadShortcut(m_commandLine.c_str(),&Lcmd))
 				{
-					m_commandDesc = Lcmd.Desc;
-					m_commandWorkDir = Lcmd.WorkDir;
-				}
-				else
-				{
-					if (m_commandDesc.IsEmpty()) m_commandDesc = Lcmd.Desc;
-					if (m_commandWorkDir.IsEmpty()) m_commandWorkDir = Lcmd.WorkDir;
-				}
+					m_commandLine = Lcmd.cmdLine;
+					if (m_flags & CMDS_FLAG_DIRS)
+					{
+						m_commandDesc = Lcmd.Desc;
+						m_commandWorkDir = Lcmd.WorkDir;
+					}
+					else
+					{
+						if (m_commandDesc.IsEmpty()) m_commandDesc = Lcmd.Desc;
+						if (m_commandWorkDir.IsEmpty()) m_commandWorkDir = Lcmd.WorkDir;
+					}
 
+				}
 			}
 		}
+		if (!x64 && m_commandLine.find("x64") != wxNOT_FOUND)
+		{
+			m_commandID = -1;
+			return;
+		}
 	}
-
 	if (m_commandName.empty())
 	{
 		m_commandFName = m_commandName;
@@ -183,24 +191,9 @@ void MerryCommand::Execute(const wxString& commandArg) const
 	#ifdef __WXMSW__
 	if (PID > 1)//禁止多个进程
 	{
-		HANDLE cmdHandle = OpenProcess(PROCESS_ALL_ACCESS,false,PID);
-		if (cmdHandle)
+		if (CheckActiveProg(PID))
 		{//已经运行,查找前激活之前的窗口
-			CloseHandle(cmdHandle);
-			HWND hWnd = ::GetTopWindow(0);
-			while ( hWnd )
-			{
-				DWORD dwPid = 0;
-				DWORD dwTheardId = ::GetWindowThreadProcessId( hWnd,&dwPid);
-				if (dwTheardId && dwPid == PID)
-				{
-					::ShowWindow(hWnd,SW_RESTORE);
-					::SetForegroundWindow(hWnd);
-					::SetActiveWindow(hWnd);
-					return;
-				}
-				hWnd = ::GetNextWindow(hWnd , GW_HWNDNEXT);
-			}
+			return;
 		}
 	}
 	#endif

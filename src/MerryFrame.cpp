@@ -26,6 +26,11 @@ wxFrame(NULL, wxID_ANY,ALMRUN_DEFAULT_TITLE, wxDefaultPosition, wxDefaultSize, w
 #endif
 	)
 {
+	#ifdef __WXMSW__
+    SetIcon(wxICON(app));
+	#else
+    SetIcon(wxICON(main));
+	#endif // __WXMSW__
 	skin = new SkinConfig();
 	if (skin->get(SHOW_WINDOW))
 		this->SetWindowStyleFlag(wxCLOSE_BOX | wxCAPTION);// | wxBORDER_NONE);
@@ -214,12 +219,13 @@ void MerryFrame::OnShowEvent(wxShowEvent& e)
 	{
 		if (g_config->get(PlayPopupNotify))//是否播放提示音
 			wxSound("Popup.wav").Play();
+		textCtrl->ChangeValue(wxT(""));
 		this->CentreOnce();
 		m_listBoxPanel->Dismiss();
 		this->Raise();
-
 		g_controller->SetWindowPos(this->GetHWND(),HWND_TOPMOST,0,0,0,0,SWP_NOMOVE | SWP_NOSIZE);
-		textCtrl->SetFocus();
+		ActiveWindow(this->GetHWND());
+//		textCtrl->SetFocus();
 #ifdef __WXMSW__
 		textCtrl->SetEnInputMode();
 #endif
@@ -236,11 +242,17 @@ void MerryFrame::CentreOnce()
 {
 	if (m_isCentred)
 		return;
-
 	this->Centre();
 	wxPoint position = this->GetPosition();
-	position.y -= skin->get(LIST_ITEM_HEIGHT) * MERRY_DEFAULT_LIST_BOX_ITEM_MAX_NUM / 4;
+	if (g_config && g_config->get(SaveWinPos))
+	{
+		position.x = g_config->conf->ReadLong("/Window/WinLeft",position.x);
+		position.y = g_config->conf->ReadLong("/Window/WinTop",position.y);
+	}
+	else
+	{
+		position.y -= skin->get(LIST_ITEM_HEIGHT) * MERRY_DEFAULT_LIST_BOX_ITEM_MAX_NUM / 4;
+	}
 	this->SetPosition(position);
-	
 	m_isCentred = true;
 }
