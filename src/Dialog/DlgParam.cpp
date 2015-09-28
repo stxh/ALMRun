@@ -7,6 +7,7 @@
 BEGIN_EVENT_TABLE(DlgParam, wxDialog)
 	EVT_BUTTON(wxID_OK, DlgParam::OnOKClick)
 	EVT_SHOW(DlgParam::OnShow)
+//	EVT_ACTIVATE(DlgParam::OnActivate)
 END_EVENT_TABLE()
 
 #ifndef _DISABLE_DND_
@@ -63,6 +64,7 @@ DlgParam::DlgParam( wxWindow* parent, wxWindowID id, const wxString& title, cons
 	comboBox->SetSelection(0);
 	comboBox->Bind(wxEVT_KEY_DOWN,&DlgParam::OnKey,this);
 	comboBox->SetToolTip("提示: \n1.选中一个历史记录按Alt+Delete可以删除.\n2.按[Alt+F]可以插入一个文件路径.\n3.按[Alt+D]可以插入一个文件夹路径");
+
 	bSizer2->Add(comboBox, 0, wxALL, 5 );
 
 	wxButton* ButtonOk = new wxButton(this,wxID_OK,"确定(&O)",wxDefaultPosition,wxDefaultSize);
@@ -71,7 +73,8 @@ DlgParam::DlgParam( wxWindow* parent, wxWindowID id, const wxString& title, cons
 	bSizer2->Add(ButtonOk,0,wxALL,5);
 	bSizer2->Add(ButtonCancel,0,wxALL,5);
 	this->Layout();
-	this->Centre( wxBOTH );
+	if (g_config->conf->ReadBool("/Window/DlgParamCenter",true))
+		this->Centre( wxBOTH );
 
 #ifndef _DISABLE_DND_
 	this->SetDropTarget(new FileDropDnd(this));
@@ -143,9 +146,9 @@ void DlgParam::OnShow(wxShowEvent& e)
 	if (e.IsShown())
 	{
 	#ifdef __WXMSW__
-		::SetWindowPos(this->GetHWND(),HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE);
+		ActiveWindow(this->GetHWND());
 	#endif
-		this->SetFocus();
+		comboBox->SetFocus();
 		comboBox->SetFocusFromKbd();
 	}
 	e.Skip();
